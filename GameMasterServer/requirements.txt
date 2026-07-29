@@ -1,0 +1,9 @@
+# GameMasterServer — Python dependencies
+#
+# Install with:
+#   pip install -r requirements.txt
+#
+# The only runtime dependency is websockets.
+# Pin to a known-good major version for reproducibility.
+
+websockets>=12.0,<14.0

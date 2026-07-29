@@ -1,0 +1,92 @@
+# ── Unity generated folders ──────────────────────────────
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# ── IDE / OS ─────────────────────────────────────────────
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Build artifacts ──────────────────────────────────────
+*.apk
+*.aab
+*.unitypackage
+*.app
+ExportedObj/
+crashlytics-build.properties
+
+# ── Asset meta of ignored files (Unity) ──────────────────
+/[Aa]ssets/AssetStoreTools*
+
+# ── Python server ─────────────────────────────────────────
+# Runtime cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+# AI server generated audio output (can be large, ephemeral)
+generated_audio/
+# Vosk offline model — too large for Git, downloaded by user per CONTRIBUTING.md
+vosk-model-small-en-us-0.15/
+vosk-model*/
+
+# ── Node / npm (phone dashboard tooling, if ever added) ──
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── Documentation screenshots ─────────────────────────────
+# Screenshots and GIFs are committed manually when available.
+# The placeholder paths referenced in README.md are intentionally
+# not committed — add real screenshots before publishing.
+# docs/screenshots/hero.png
+# docs/screenshots/architecture.png
+
+# ── Files over GitHub's 100 MB limit ─────────────────────
+# Alternate-weapon texture caches (~1.1 GB total).
+# Not used by the default pistol. Not tracked in Git.
+# If you need these, generate them locally in the Unity Editor.
+Assets/Resources/Models/ThompsonTextures/Metal_Albedo.asset
+Assets/Resources/Models/ThompsonTextures/Metal_Normal.asset
+Assets/Resources/Models/ThompsonTextures/Wood_Albedo.asset
+Assets/Resources/Models/ThompsonTextures/Wood_Metallic.asset
+Assets/Resources/Models/ThompsonTextures/Wood_Normal.asset
+Assets/Resources/Models/RemingtonTextures/remington_02_Metallic-remington_02_Roughness.asset
+Assets/Resources/Models/RemingtonTextures/remington_02_Normal.asset
