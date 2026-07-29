@@ -3,7 +3,7 @@
 # QUANTUMSHIFT-XR
 
 **A Mixed Reality Alien Shooter for Meta Quest 3**  
-**Powered by a local LLM, a companion radar dashboard, and your own living room**
+**Powered by a local LLM, an embedded Arduino voice interface, a companion radar dashboard, and your own living room**
 
 *Built in 24 hours · Snapdragon Multiverse Hackathon Finale · Qualcomm Bangalore Campus · July 2026*
 
@@ -12,6 +12,7 @@
 ![Unity](https://img.shields.io/badge/Unity-6000.3.19f1-black?logo=unity&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Meta%20Quest%203-blue?logo=meta&logoColor=white)
 ![AR Foundation](https://img.shields.io/badge/AR%20Foundation-6.4.1-7a5cff)
+![Arduino](https://img.shields.io/badge/Arduino-Uno%20Q-00979D?logo=arduino&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -35,14 +36,16 @@
   - [Gem Hunt Mode](#gem-hunt-mode)
   - [Classic Wave Mode](#classic-wave-mode)
   - [AI Commentary Pipeline](#ai-commentary-pipeline)
+  - [Embedded Voice Command Subsystem](#embedded-voice-command-subsystem-keyword-spotting)
   - [Game Master Dashboard](#game-master-dashboard)
   - [AR-Aware Spawning](#ar-aware-spawning)
 - [Setup & Installation](#setup--installation)
   - [Prerequisites](#prerequisites)
   - [1 · Unity Project](#1--unity-project)
   - [2 · Python AI Server (optional)](#2--python-ai-server-optional)
-  - [3 · Tactical Hub WebSocket Relay (optional)](#3--tactical-hub-websocket-relay-optional)
-  - [4 · Phone Game Master Dashboard (optional)](#4--phone-game-master-dashboard-optional)
+  - [3 · Arduino Uno Q (Voice Pipeline)](#3--arduino-uno-q-voice-pipeline)
+  - [4 · Tactical Hub WebSocket Relay (optional)](#4--tactical-hub-websocket-relay-optional)
+  - [5 · Phone Game Master Dashboard (optional)](#5--phone-game-master-dashboard-optional)
 - [Controls](#controls)
 - [3D-Printable Gun Attachment](#3d-printable-gun-attachment)
 - [Current Architecture](#current-architecture)
@@ -58,7 +61,7 @@
 
 QUANTUMSHIFT-XR turns the player's physical room into a battlefield. Using Meta Quest 3 passthrough and the AR Foundation Scene API, aliens spawn on real furniture, behind real walls, and on the floor of your actual space. The player shoots, punches, and dodges through waves of enemies while hunting four hidden gems that escalate the tension — until the room goes dark and a boss emerges from the nearest wall.
 
-A local AI commentary system (Qwen via Ollama + Piper TTS) watches every kill, headshot, and health drop and delivers spoken commentary through the headset — no cloud API required. A second player can open a radar dashboard on a phone browser and tap to spawn enemies anywhere in the room, in real time.
+A local AI commentary system (Qwen via Ollama + Piper TTS) watches every kill, headshot, and health drop and delivers spoken commentary through the headset — no cloud API required. An onboard **Arduino Uno Q** running edge Keyword Spotting (KWS via Vosk) captures local voice commands without network round-trip delay. A second player can open a radar dashboard on a phone browser and tap to spawn enemies anywhere in the room, in real time.
 
 ---
 
@@ -73,9 +76,10 @@ A local AI commentary system (Qwen via Ollama + Piper TTS) watches every kill, h
 | 🌑 **Horror atmosphere** | Room darkens after final gem; red fog, embers, lightning, rumble |
 | 👾 **Boss fight** | Final boss spawns at the nearest real wall and stalks through the dark |
 | 🧠 **Local AI commentary** | Qwen (via Ollama) + Piper TTS; zero cloud LLM dependency |
+| 🎙️ **Embedded voice KWS** | Arduino Uno Q running local Keyword Spotting (Vosk) for offline voice commands |
 | 📡 **AI telemetry bridge** | Unity → Python: game state POSTed every second; commentary returned as audio |
 | 📱 **Game Master radar** | Second player controls enemy spawns live via phone browser (no app install) |
-| 🌐 **WebSocket relay** | Tactical Hub relays phone → Unity over LAN |
+| 🌐 **WebSocket relay** | Tactical Hub relays Arduino & phone commands to Unity over LAN |
 | 🛸 **AR-aware spawning** | 3-tier: AR bounding boxes (furniture) → AR planes (floor) → radial fallback |
 | 🔊 **Procedural audio** | All sound effects generated at runtime; no AudioClip assets required |
 | ✨ **Procedural VFX** | Muzzle flash, hit particles, room crack rifts — built in code |
@@ -94,6 +98,10 @@ graph TB
         NetworkClient["NetworkClient.cs\nWebSocket Client"]
     end
 
+    subgraph ArduinoBoard["Arduino Uno Q"]
+        ArduinoKWS["Arduino Uno Q\n(KWS / Vosk)"]
+    end
+
     subgraph PC["PC / Snapdragon Laptop"]
         AIServer["Python AI Server\n(FastAPI · port 8000)\nQwen via Ollama + Piper TTS"]
         TacticalHub["tactical_hub.py\nWebSocket Relay\n(port 8765)"]
@@ -108,14 +116,16 @@ graph TB
     AIServer -- "commentary text\n+ audio URL" --> GameBridge
     GameBridge -- "plays TTS audio\nshows caption" --> Unity
 
+    ArduinoKWS -- "voice event\nover WS" --> TacticalHub
     Dashboard -- "spawn command\nJSON over WS" --> TacticalHub
     TacticalHub -- "broadcasts to\nall clients" --> NetworkClient
-    NetworkClient -- "AlienWaveManager\n.SpawnEnemyAt()" --> Unity
+    NetworkClient -- "Game Events / Spawns" --> Unity
 ```
 
 | Component | Technology |
 |---|---|
 | Meta Quest 3 | Unity 6, AR Foundation, Meta XR SDK (MRUK) |
+| Arduino Uno Q | Onboard Keyword Spotting (KWS / Vosk), WebSocket client |
 | AI Server | Python, FastAPI (or compatible), Ollama (Qwen), Piper TTS |
 | WebSocket Relay | Python `websockets`, port 8765 |
 | Phone Dashboard | Vanilla HTML/CSS/JS, WebSocket API, Canvas 2D |
@@ -138,6 +148,14 @@ graph TB
 | Meta OpenXR Plugin | 2.5.0 |
 | GLTFast (runtime 3D model loading) | 6.19.0 |
 
+**Embedded & Edge AI**
+
+| Tool / Model | Purpose |
+|---|---|
+| Arduino Uno Q | Microcontroller board for offline voice interface |
+| Vosk KWS Model | Onboard offline keyword recognition model (`vosk-model-small-en-us-0.15`) |
+| Arduino App Lab / Python | Board environment and WebSocket event transmitter |
+
 **Python**
 
 | Library | Purpose |
@@ -152,6 +170,7 @@ graph TB
 | Device | Role |
 |---|---|
 | Meta Quest 3 | MR rendering, passthrough, mic/speaker |
+| Arduino Uno Q | Edge Keyword Spotting (offline voice commands) |
 | Snapdragon X Elite laptop | AI server + relay host |
 | Snapdragon phone (or any modern browser) | Game Master radar dashboard |
 
@@ -280,6 +299,17 @@ sequenceDiagram
 
 > **The game runs fully without a Python server.** The AI commentary is additive — if `GameBridge` cannot reach the server, it logs a warning and all gameplay continues normally.
 
+### Embedded Voice Command Subsystem (Keyword Spotting)
+
+```
+Arduino Uno Q ──► Keyword Spotting (TinyML) ──► Voice Command ──► Python WebSocket Relay ──► Unity MR Application ──► Gameplay Event
+```
+
+- **Edge Keyword Spotting:** The Arduino Uno Q runs an onboard Keyword Spotting (KWS) model (Vosk / TinyML) directly on the board.
+- **Offline & Low Latency:** Captures audio from a USB microphone, processes speech locally, and detects trigger keywords (such as pause, resume, or tactical commands) with zero cloud dependency.
+- **Relay Transmission:** Once a keyword is identified, the board dispatches a JSON command over WebSocket to `tactical_hub.py` (port 8765).
+- **Unity Event Execution:** `NetworkClient.cs` receives the broadcasted command and invokes the target game event in Unity.
+
 ### Game Master Dashboard
 
 A second participant opens `GameMasterServer/index.html` in a phone browser. It connects to `tactical_hub.py` via WebSocket and renders a top-down radar of the room:
@@ -316,6 +346,7 @@ Each alien spawn is preceded 1 second earlier by a `RoomCrackVFX` rift — a vis
 |---|---|
 | Meta Quest 3 | With Developer Mode enabled |
 | Unity Hub | With Unity 6000.3.19f1 installed (Android module required) |
+| Arduino Uno Q | With USB microphone & Arduino App Lab / IDE |
 | Python 3.10+ | For the WebSocket relay (`tactical_hub.py`) |
 | Ollama + Qwen | For AI commentary (optional) |
 | Piper TTS | For spoken commentary audio (optional) |
@@ -366,9 +397,19 @@ pip install piper-tts
 
 ---
 
-### 3 · Tactical Hub WebSocket Relay (optional)
+### 3 · Arduino Uno Q (Voice Pipeline)
 
-Required only if using the phone Game Master dashboard.
+1. Connect the Arduino Uno Q to the same Wi-Fi network as your PC.
+2. Load the Keyword Spotting application via **Arduino App Lab** (or Arduino IDE).
+3. Ensure the Vosk model (`vosk-model-small-en-us-0.15`) is downloaded and configured on the board.
+4. Set `PC_HUB_IP` in the board's script (`python/server.py`) to your PC's LAN IP.
+5. Launch the application. The board connects to `ws://<PC_IP>:8765` and begins listening for offline voice commands.
+
+---
+
+### 4 · Tactical Hub WebSocket Relay (optional)
+
+Required if using the phone Game Master dashboard or the Arduino voice interface.
 
 ```bash
 cd GameMasterServer
@@ -390,13 +431,13 @@ Expected output:
 [10:00:00] 🟢 Server is LIVE on ws://0.0.0.0:8765
 ```
 
-The relay runs on **all interfaces** (`0.0.0.0`). Note the machine's LAN IP address — you will need it for the phone dashboard and the Unity `NetworkClient`.
+The relay runs on **all interfaces** (`0.0.0.0`). Note the machine's LAN IP address — you will need it for the phone dashboard, Arduino, and the Unity `NetworkClient`.
 
 > ⚠️ **Security:** Do not expose port 8765 to the internet. The relay has no authentication and broadcasts all messages to all connected clients. See [SECURITY.md](SECURITY.md).
 
 ---
 
-### 4 · Phone Game Master Dashboard (optional)
+### 5 · Phone Game Master Dashboard (optional)
 
 `index.html` connects via WebSocket to `tactical_hub.py` on port 8765, but it must be **served over HTTP** — not opened as a `file://` URL. The easiest way is a one-line Python server:
 
@@ -427,6 +468,7 @@ The dashboard auto-connects to `ws://<same-hostname>:8765`. The status dot turns
 | **A Button** (primary) | Manual reload |
 | **Fast controller swing** | Melee punch (velocity ≥ 1.6 m/s, range 0.9 m) |
 | **Controller close to head** | Aim Down Sights (ADS) — boosts damage 1.5×, tightens spread |
+| **Voice Command** (Arduino KWS) | Offline Keyword Spotting (e.g. pause/resume gameplay) |
 
 > **Game start:** Pull the trigger once on the start screen to begin.
 
@@ -461,7 +503,8 @@ graph TD
         HUD["GameHUD\nIn-headset UI"]
     end
 
-    subgraph "External"
+    subgraph "External & Edge"
+        Arduino["Arduino Uno Q\n(KWS / Edge Inference)"]
         PySrv["Python AI Server\n:8000"]
         Hub["tactical_hub.py\n:8765"]
         Phone["Phone Dashboard\nindex.html"]
@@ -477,16 +520,18 @@ graph TD
     GB -- "reflection poll\nevery 0.25s" --> GM & PS & PH & AWM
     GB -- "HTTP POST" --> PySrv
     PySrv -- "text + audio_url" --> GB
+    Arduino -- "WS voice cmd" --> Hub
     Phone -- "WS spawn cmd" --> Hub
     Hub -- "broadcast" --> NC
-    NC -- "SpawnEnemyAt" --> AWM
+    NC -- "Events / Spawns" --> Unity
     GM & AWM & PS --> HUD
 ```
 
-The architecture has two loosely coupled subsystems layered on top of the core game loop:
+The architecture has three loosely coupled subsystems layered on top of the core game loop:
 
 1. **AI Commentary** — `GameBridge` observes the game via C# reflection (no wiring) and communicates over HTTP. Removing the Python server changes nothing in gameplay.
-2. **Game Master** — `NetworkClient` + `tactical_hub.py` + `index.html` form a WebSocket chain. Removing the relay changes nothing in gameplay.
+2. **Embedded Voice Interface** — `Arduino Uno Q` performs edge Keyword Spotting and transmits voice events over WebSocket.
+3. **Game Master** — `NetworkClient` + `tactical_hub.py` + `index.html` form a WebSocket chain for live phone radar control.
 
 ---
 
@@ -551,6 +596,7 @@ You are free to use, modify, and distribute this project for any purpose, includ
 
 - **Qualcomm** — for hosting the Snapdragon Multiverse Hackathon Finale and providing the hardware kit.
 - **Meta** — for AR Foundation, the Meta XR Utility Kit (MRUK), and the Quest 3 platform.
+- **Arduino** — for the Uno Q board, enabling onboard Keyword Spotting (KWS) and edge voice commands.
 - **Unity Technologies** — for Unity 6, the XR Interaction Toolkit, and AR Foundation.
 - **Ollama** — for making local LLM deployment straightforward.
 - **Piper TTS** — for offline, high-quality text-to-speech synthesis.

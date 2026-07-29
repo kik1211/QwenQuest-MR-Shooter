@@ -6,7 +6,7 @@ This document describes the software architecture of QUANTUMSHIFT-XR as verified
 
 ## High-Level System
 
-QUANTUMSHIFT-XR has three independently deployable components connected over a shared LAN:
+QUANTUMSHIFT-XR has four independently deployable hardware and software components connected over a shared LAN:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -23,17 +23,18 @@ QUANTUMSHIFT-XR has three independently deployable components connected over a s
    │  Python AI      │       │  tactical_hub.py    │
    │  Server :8000   │       │  WebSocket Relay    │
    │  (user-supplied)│       │  :8765              │
-   └─────────────────┘       └──────────┬──────────┘
-                                        │ WebSocket
-                                        ▼
-                              ┌─────────────────────┐
-                              │  Phone Browser      │
-                              │  index.html         │
-                              │  Radar Dashboard    │
-                              └─────────────────────┘
+   └─────────────────┘       └──────┬───────┬──────┘
+                                    │ WS    │ WS
+                        ┌───────────┘       └───────────┐
+                        ▼                               ▼
+             ┌─────────────────────┐         ┌─────────────────────┐
+             │  Arduino Uno Q      │         │  Phone Browser      │
+             │  Keyword Spotting   │         │  index.html         │
+             │  (Embedded KWS)     │         │  Radar Dashboard    │
+             └─────────────────────┘         └─────────────────────┘
 ```
 
-Each component is optional. The Unity game runs without the AI server and without the relay — both subsystems gracefully degrade to no-ops.
+Each component is optional. The Unity game runs without the AI server, Arduino board, and relay — all subsystems gracefully degrade to no-ops.
 
 ---
 
@@ -162,6 +163,35 @@ POST /commentary
 | `boss_low_health` | Polled: boss HP < 25% |
 
 > **Note (verified):** As of the hackathon submission, `PlayerShooter.cs` and `PlayerHealth.cs` do not call `GameBridge.Instance.Report*()` directly. The trigger for all events is the reflection-based state sampler (0.25s interval), not event push from the source scripts.
+
+---
+
+## Embedded Voice Subsystem (Arduino Uno Q)
+
+### Responsibilities
+- **Edge Audio Sampling:** Samples microphone audio locally via a connected USB microphone.
+- **Onboard Keyword Spotting (KWS):** Runs an onboard Vosk model (`vosk-model-small-en-us-0.15`) within an Arduino App Lab runtime to detect trigger keywords offline with zero cloud dependency.
+- **WebSocket Event Dispatch:** Transmits voice event messages over WebSocket to the `tactical_hub.py` relay (port 8765).
+
+### Data Flow & Communication Path
+
+```
+Arduino Uno Q (USB Mic)
+    │
+    ▼ (Onboard Vosk KWS model)
+Keyword Recognized
+    │
+    ▼ (WebSocket message)
+tactical_hub.py (Port 8765)
+    │
+    ▼ (Broadcast over WebSocket)
+NetworkClient.cs / Unity Bridge
+    │
+    ▼
+Unity Provider / Game Event
+```
+
+> **Note (verified):** In C#, `ConversationManager.cs` tracks `ArduinoProvider` (implementing `IConversationProvider`) and `GameBridge.cs` maintains the `arduinoOnline` flag for voice dialogue provider fallback (`Cloud → Arduino → Local`).
 
 ---
 

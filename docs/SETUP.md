@@ -12,6 +12,7 @@ This guide covers every component of the QUANTUMSHIFT-XR system.
 |---|---|---|
 | Unity project (Quest 3) | ✅ Yes | Repository root (`Edge-Cloud-AI-with-MRUK-main/`) |
 | Python AI server | ❌ Optional | User-supplied (see Step 3) |
+| Arduino Uno Q (Voice KWS) | ❌ Optional | Arduino App Lab project (`uno-q-app/`) |
 | WebSocket relay | ❌ Optional | `GameMasterServer/tactical_hub.py` |
 | Phone dashboard | ❌ Optional | `GameMasterServer/index.html` |
 
@@ -71,9 +72,7 @@ Set these values in the Unity Inspector (before building):
 
 ## Step 3 · Python AI Server (optional)
 
-The AI server is **not included** in this repository. You must supply a compatible server.
-
-`GameBridge.cs` expects these HTTP endpoints at the configured `Server Base Url`:
+The AI server is **not included** in this repository — you supply it. `GameBridge.cs` expects a FastAPI-compatible server at port 8000 with these endpoints:
 
 ### Required endpoints
 
@@ -141,9 +140,37 @@ pip install piper-tts
 
 ---
 
-## Step 4 · WebSocket Relay (optional)
+## Step 4 · Arduino Uno Q Setup (Voice KWS)
 
-Required only if using the phone Game Master dashboard.
+The Arduino Uno Q runs an onboard Keyword Spotting (KWS) script to recognize offline voice commands and send them to the relay server.
+
+### Requirements
+- **Hardware:** Arduino Uno Q board with a connected USB microphone.
+- **Software:** Arduino App Lab (or Arduino IDE with Linux/Python environment enabled).
+- **Vosk KWS Model:** `vosk-model-small-en-us-0.15` (lightweight speech recognition model).
+
+### Firmware & Runtime Setup
+
+1. Connect the Arduino Uno Q to the same local Wi-Fi network as the PC running `tactical_hub.py`.
+2. Download the Vosk model archive and unpack it onto the board:
+   ```bash
+   wget https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+   unzip vosk-model-small-en-us-0.15.zip -d uno-q-app/python/
+   ```
+3. Open the project in **Arduino App Lab**.
+4. Configure `PC_HUB_IP` inside `python/server.py` to point to your PC's LAN IP address:
+   ```python
+   PC_HUB_IP = "192.168.1.x"  # Replace with host PC IP
+   ```
+5. Click **Run** in Arduino App Lab to start the KWS listener.
+6. When a keyword is recognized, the script dispatches a WebSocket message to `ws://<PC_HUB_IP>:8765`.
+7. `tactical_hub.py` broadcasts the message to connected clients over the local network.
+
+---
+
+## Step 5 · WebSocket Relay (optional)
+
+Required if using the phone Game Master dashboard or the Arduino voice interface.
 
 ```bash
 cd GameMasterServer
@@ -171,7 +198,7 @@ The server shuts down cleanly with **Ctrl+C**.
 
 ---
 
-## Step 5 · Phone Game Master Dashboard (optional)
+## Step 6 · Phone Game Master Dashboard (optional)
 
 ### Serving the dashboard
 
