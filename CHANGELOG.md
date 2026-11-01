@@ -20,8 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `GameMasterServer/requirements.txt` — Python dependency declaration
 - `docs/ARCHITECTURE.md` — detailed architecture, state machine, protocol specifications
 - `docs/SETUP.md` — full multi-component setup guide with troubleshooting
-- `docs/GITHUB_SETUP.md` — GitHub topics, description, badges, release notes guide
-- `docs/screenshots/README.md` — screenshot capture instructions
 
 ### Changed
 - `README.md` — complete rewrite: accurate project structure, Mermaid diagrams, controls table, verified limitations, future improvements
