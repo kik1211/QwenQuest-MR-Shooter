@@ -15,6 +15,7 @@
 ![Arduino](https://img.shields.io/badge/Arduino-Uno%20Q-00979D?logo=arduino&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
+[![CI](https://github.com/kik1211/QwenQuest-MR-Shooter/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kik1211/QwenQuest-MR-Shooter/actions/workflows/ci.yml)
 
 </div>
 
