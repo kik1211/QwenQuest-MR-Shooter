@@ -20,10 +20,6 @@
 
 ---
 
-> 📸 **Hero screenshot goes here.**  
-> *Capture a frame from a Quest screen recording (via Quest Casting) showing the player, an alien, and the passthrough room together. See [`docs/screenshots/README.md`](docs/screenshots/README.md) for capture instructions.*
-
----
 
 ## Table of Contents
 
@@ -213,9 +209,7 @@ Edge-Cloud-AI-with-MRUK-main/
 ├── docs/
 │   ├── README.md                  ← Documentation index
 │   ├── ARCHITECTURE.md            ← Detailed architecture, state machine, protocol specs
-│   ├── SETUP.md                   ← Full multi-component setup guide with troubleshooting
-│   ├── GITHUB_SETUP.md            ← GitHub topics, description, badges, release notes
-│   └── screenshots/               ← README images (see docs/screenshots/README.md)
+│   └── SETUP.md                   ← Full multi-component setup guide with troubleshooting
 │
 ├── QuestGunAttachment - Left Slider Stock.stl   ← 3D-printable controller grip
 ├── QuestGunAttachment - Right Bar Stock.stl     ← 3D-printable controller grip
