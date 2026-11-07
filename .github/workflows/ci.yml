@@ -1,0 +1,236 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Static Project Validation
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.x'
+
+      - name: Check A - Unity Version
+        run: |
+          echo "=== Check A: Unity Version Validation ==="
+          if [ ! -f "ProjectSettings/ProjectVersion.txt" ]; then
+            echo "::error file=ProjectSettings/ProjectVersion.txt::ProjectSettings/ProjectVersion.txt not found"
+            exit 1
+          fi
+          VERSION=$(grep -E '^m_EditorVersion:' ProjectSettings/ProjectVersion.txt | awk '{print $2}')
+          echo "Detected Unity Editor version: $VERSION"
+          if [ "$VERSION" != "6000.3.19f1" ]; then
+            echo "::error file=ProjectSettings/ProjectVersion.txt::Expected Unity Editor version 6000.3.19f1, but found '$VERSION'"
+            exit 1
+          fi
+          echo "Unity Editor version verified: $VERSION"
+
+      - name: Check B - Package Manifest JSON
+        run: |
+          echo "=== Check B: Package Manifest JSON Validation ==="
+          export PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache"
+          python -c "
+          import json, sys
+
+          for path in ['Packages/manifest.json', 'Packages/packages-lock.json']:
+              try:
+                  with open(path, 'r', encoding='utf-8') as f:
+                      data = json.load(f)
+                  print(f'Valid JSON: {path} ({len(data)} root keys)')
+              except Exception as e:
+                  print(f'::error file={path}::Invalid JSON: {e}', file=sys.stderr)
+                  sys.exit(1)
+          "
+
+      - name: Check C - Python Relay
+        run: |
+          echo "=== Check C: Python Relay Validation ==="
+          export PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache"
+          pip install -r GameMasterServer/requirements.txt
+          pip check
+          python -m py_compile GameMasterServer/tactical_hub.py
+          echo "Python relay dependencies and syntax validated successfully."
+
+      - name: Check D - C# 9 Roslyn Syntax Validation
+        run: |
+          echo "=== Check D: C# 9 Roslyn Syntax Validation ==="
+          CHECKER_DIR="$RUNNER_TEMP/csharp-syntax-checker"
+          mkdir -p "$CHECKER_DIR"
+          cd "$CHECKER_DIR"
+
+          dotnet new console --name RoslynChecker --output . --no-restore
+          dotnet add package Microsoft.CodeAnalysis.CSharp --version 5.9.0
+
+          cat << 'EOF' > Program.cs
+          using System;
+          using System.IO;
+          using System.Linq;
+          using Microsoft.CodeAnalysis;
+          using Microsoft.CodeAnalysis.CSharp;
+
+          class Program
+          {
+              static int Main(string[] args)
+              {
+                  string targetDir = args.Length > 0 ? args[0] : Path.Combine(Directory.GetCurrentDirectory(), "Assets", "Scripts");
+                  if (!Directory.Exists(targetDir))
+                  {
+                      Console.WriteLine($"::error::Target directory does not exist: {targetDir}");
+                      return 1;
+                  }
+
+                  var csFiles = Directory.GetFiles(targetDir, "*.cs", SearchOption.AllDirectories)
+                                         .OrderBy(f => f)
+                                         .ToList();
+
+                  if (csFiles.Count == 0)
+                  {
+                      Console.WriteLine($"::error::No C# files found under: {targetDir}");
+                      return 1;
+                  }
+
+                  Console.WriteLine($"Discovered {csFiles.Count} C# script(s) under {targetDir}");
+                  int errorCount = 0;
+                  var parseOptions = new CSharpParseOptions(LanguageVersion.CSharp9);
+
+                  foreach (var file in csFiles)
+                  {
+                      string sourceText = File.ReadAllText(file);
+                      var syntaxTree = CSharpSyntaxTree.ParseText(sourceText, parseOptions, path: file);
+                      var diagnostics = syntaxTree.GetDiagnostics()
+                                                  .Where(d => d.Severity == DiagnosticSeverity.Error)
+                                                  .ToList();
+
+                      if (diagnostics.Count > 0)
+                      {
+                          foreach (var diag in diagnostics)
+                          {
+                              var lineSpan = diag.Location.GetLineSpan();
+                              int line = lineSpan.StartLinePosition.Line + 1;
+                              int col = lineSpan.StartLinePosition.Character + 1;
+                              Console.WriteLine($"::error file={file},line={line},col={col}::{diag.Id}: {diag.GetMessage()}");
+                              errorCount++;
+                          }
+                      }
+                  }
+
+                  if (errorCount > 0)
+                  {
+                      Console.WriteLine($"\nFAILED: Found {errorCount} syntax error(s) across {csFiles.Count} C# files.");
+                      return 1;
+                  }
+
+                  Console.WriteLine($"\nSUCCESS: Successfully parsed all {csFiles.Count} C# script(s) with LanguageVersion.CSharp9 (0 syntax errors).");
+                  return 0;
+              }
+          }
+          EOF
+
+          dotnet run --project "$CHECKER_DIR" -- "$GITHUB_WORKSPACE/Assets/Scripts"
+
+      - name: Check E - Unity Script Meta Integrity
+        run: |
+          echo "=== Check E: Unity Script Meta Integrity ==="
+          export PYTHONPYCACHEPREFIX="$RUNNER_TEMP/pycache"
+          python -c "
+          import os, re, sys
+
+          scripts_dir = os.path.join(os.getcwd(), 'Assets', 'Scripts')
+          if not os.path.isdir(scripts_dir):
+              print(f'::error::Assets/Scripts directory not found at {scripts_dir}', file=sys.stderr)
+              sys.exit(1)
+
+          cs_files = []
+          for root, _, files in os.walk(scripts_dir):
+              for f in files:
+                  if f.endswith('.cs'):
+                      cs_files.append(os.path.join(root, f))
+
+          if not cs_files:
+              print('::error::No .cs files found under Assets/Scripts', file=sys.stderr)
+              sys.exit(1)
+
+          guid_pattern = re.compile(r'^guid:\s*([0-9a-fA-F]{32})\s*$')
+          valid_guid_pattern = re.compile(r'^[0-9a-f]{32}$')
+
+          seen_guids = {}
+          missing_meta = []
+          invalid_guids = []
+          duplicates = []
+
+          for cs_path in sorted(cs_files):
+              meta_path = cs_path + '.meta'
+              rel_cs = os.path.relpath(cs_path)
+              rel_meta = os.path.relpath(meta_path)
+              
+              if not os.path.isfile(meta_path):
+                  missing_meta.append(rel_cs)
+                  continue
+                  
+              found_guid = None
+              with open(meta_path, 'r', encoding='utf-8') as f:
+                  for line in f:
+                      m = guid_pattern.match(line.strip())
+                      if m:
+                          found_guid = m.group(1)
+                          break
+                          
+              if not found_guid or not valid_guid_pattern.match(found_guid):
+                  invalid_guids.append((rel_meta, found_guid))
+              else:
+                  if found_guid in seen_guids:
+                      duplicates.append((rel_meta, seen_guids[found_guid], found_guid))
+                  else:
+                      seen_guids[found_guid] = rel_meta
+
+          has_errors = False
+          if missing_meta:
+              for f in missing_meta:
+                  print(f'::error file={f}::Missing .meta file for script: {f}', file=sys.stderr)
+              has_errors = True
+
+          if invalid_guids:
+              for m, g in invalid_guids:
+                  print(f'::error file={m}::Invalid GUID \'{g}\' in meta file: {m} (expected 32 lowercase hex characters)', file=sys.stderr)
+              has_errors = True
+
+          if duplicates:
+              for m1, m2, g in duplicates:
+                  print(f'::error file={m1}::Duplicate GUID \'{g}\' found in {m1} and {m2}', file=sys.stderr)
+              has_errors = True
+
+          if has_errors:
+              sys.exit(1)
+
+          print(f'Successfully verified {len(cs_files)} C# script(s) and corresponding .meta files.')
+          print(f'All {len(seen_guids)} GUIDs are valid 32-character lowercase hex strings and unique.')
+          "
+
+      - name: Check F - Build Scene Limitation Notice
+        run: |
+          echo "=== Check F: Build Scene Limitation Notice ==="
+          if [ -f "ProjectSettings/EditorBuildSettings.asset" ]; then
+            if grep -q "Assets/Scenes/SampleScene.unity" "ProjectSettings/EditorBuildSettings.asset" && [ ! -f "Assets/Scenes/SampleScene.unity" ]; then
+              echo "::warning title=Build Scene Deferred::ProjectSettings/EditorBuildSettings.asset references 'Assets/Scenes/SampleScene.unity', which is currently not tracked in Git. Unity Editor batch-mode import and Android APK compilation are deferred until scene assets are committed."
+              echo "Notice: Full Unity build validation deferred because Assets/Scenes/SampleScene.unity is absent from the repository."
+            fi
+          fi
